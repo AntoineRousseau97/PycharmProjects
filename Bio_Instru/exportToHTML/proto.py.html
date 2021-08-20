@@ -1,0 +1,219 @@
+<html>
+<head>
+<title>proto.py</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style type="text/css">
+.s0 { color: #cc7832;}
+.s1 { color: #a9b7c6;}
+.s2 { color: #629755; font-style: italic;}
+.s3 { color: #6897bb;}
+.s4 { color: #6a8759;}
+.s5 { color: #808080;}
+</style>
+</head>
+<body bgcolor="#2b2b2b">
+<table CELLSPACING=0 CELLPADDING=5 COLS=1 WIDTH="100%" BGCOLOR="#606060" >
+<tr><td><center>
+<font face="Arial, Helvetica" color="#000000">
+proto.py</font>
+</center></td></tr></table>
+<pre><span class="s0">import </span><span class="s1">numpy </span><span class="s0">as </span><span class="s1">np</span>
+<span class="s0">import </span><span class="s1">matplotlib.pyplot </span><span class="s0">as </span><span class="s1">plt</span>
+<span class="s0">import </span><span class="s1">os</span>
+<span class="s0">from </span><span class="s1">sklearn.discriminant_analysis </span><span class="s0">import </span><span class="s1">LinearDiscriminantAnalysis</span>
+<span class="s0">from </span><span class="s1">sklearn.model_selection </span><span class="s0">import </span><span class="s1">RepeatedKFold</span>
+<span class="s0">from </span><span class="s1">sklearn </span><span class="s0">import </span><span class="s1">preprocessing</span>
+
+<span class="s0">def </span><span class="s1">getMAV(x):</span>
+    <span class="s2">''' 
+    Computes the Mean Absolute Value (MAV) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Mean Absolute Value as [float] 
+    '''</span>
+    <span class="s1">MAV = np.mean(np.abs(x))</span>
+    <span class="s0">return </span><span class="s1">MAV</span>
+
+<span class="s0">def </span><span class="s1">getRMS(x):</span>
+    <span class="s2">''' 
+    Computes the Root Mean Square value (RMS) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Root Mean Square value as [float] 
+    '''</span>
+    <span class="s1">RMS = np.sqrt(np.mean(x**</span><span class="s3">2</span><span class="s1">))</span>
+    <span class="s0">return </span><span class="s1">RMS</span>
+
+<span class="s0">def </span><span class="s1">getVar(x):</span>
+    <span class="s2">''' 
+    Computes the Variance of EMG (Var) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Variance of EMG as [float] 
+    '''</span>
+    <span class="s1">N = np.size(x)</span>
+    <span class="s1">Var = (</span><span class="s3">1</span><span class="s1">/(N-</span><span class="s3">1</span><span class="s1">))*np.sum(x**</span><span class="s3">2</span><span class="s1">)</span>
+    <span class="s0">return </span><span class="s1">Var</span>
+
+<span class="s0">def </span><span class="s1">getSD(x):</span>
+    <span class="s2">''' 
+    Computes the Standard Deviation (SD) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Standard Deviation as [float] 
+    '''</span>
+    <span class="s1">N = np.size(x)</span>
+    <span class="s1">xx = np.mean(x)</span>
+    <span class="s1">SD = np.sqrt(</span><span class="s3">1</span><span class="s1">/(N-</span><span class="s3">1</span><span class="s1">)*np.sum((x-xx)**</span><span class="s3">2</span><span class="s1">))</span>
+    <span class="s0">return </span><span class="s1">SD</span>
+
+<span class="s0">def </span><span class="s1">getZC(x</span><span class="s0">, </span><span class="s1">threshold=</span><span class="s3">0</span><span class="s1">):</span>
+    <span class="s2">''' 
+    Computes the Zero Crossing value (ZC) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Zero Crossing value as [float] 
+    '''</span>
+    <span class="s1">N = np.size(x)</span>
+    <span class="s1">ZC=</span><span class="s3">0</span>
+    <span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">range(N-</span><span class="s3">1</span><span class="s1">):</span>
+        <span class="s0">if </span><span class="s1">(x[i]*x[i+</span><span class="s3">1</span><span class="s1">] &lt; </span><span class="s3">0</span><span class="s1">) </span><span class="s0">and </span><span class="s1">(np.abs(x[i]-x[i+</span><span class="s3">1</span><span class="s1">]) &gt;= threshold):</span>
+            <span class="s1">ZC += </span><span class="s3">1</span>
+    <span class="s0">return </span><span class="s1">ZC</span>
+
+<span class="s0">def </span><span class="s1">getSSC(x</span><span class="s0">, </span><span class="s1">threshold=</span><span class="s3">0</span><span class="s1">):</span>
+    <span class="s2">''' 
+    Computes the Slope Sign Change value (SSC) 
+    :param x: EMG signal vector as [1-D numpy array] 
+    :return: Slope Sign Change value as [float] 
+    '''</span>
+    <span class="s1">N = np.size(x)</span>
+    <span class="s1">SSC = </span><span class="s3">0</span>
+    <span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">range(</span><span class="s3">1</span><span class="s0">, </span><span class="s1">N-</span><span class="s3">1</span><span class="s1">):</span>
+        <span class="s0">if </span><span class="s1">(((x[i] &gt; x[i-</span><span class="s3">1</span><span class="s1">]) </span><span class="s0">and </span><span class="s1">(x[i] &gt; x[i+</span><span class="s3">1</span><span class="s1">])) </span><span class="s0">or </span><span class="s1">((x[i] &lt; x[i-</span><span class="s3">1</span><span class="s1">]) </span><span class="s0">and </span><span class="s1">(x[i] &lt; x[i+</span><span class="s3">1</span><span class="s1">]))) </span><span class="s0">and </span><span class="s1">((np.abs(x[i]-x[i+</span><span class="s3">1</span><span class="s1">]) &gt;= threshold) </span><span class="s0">or </span><span class="s1">(np.abs(x[i]-x[i-</span><span class="s3">1</span><span class="s1">]) &gt;= threshold)):</span>
+            <span class="s1">SSC += </span><span class="s3">1</span>
+    <span class="s0">return </span><span class="s1">SSC</span>
+
+
+<span class="s0">def </span><span class="s1">segment_dataset(filepath</span><span class="s0">, </span><span class="s1">window_length=</span><span class="s3">200</span><span class="s0">, </span><span class="s1">classes=</span><span class="s0">None</span><span class="s1">):</span>
+    <span class="s1">files = os.listdir(filepath)</span>
+    <span class="s1">fileNames = []</span>
+    <span class="s1">data = []</span>
+    <span class="s1">labels = []</span>
+    <span class="s0">for </span><span class="s1">f </span><span class="s0">in </span><span class="s1">files:</span>
+        <span class="s0">if </span><span class="s1">f.endswith(</span><span class="s4">'.csv'</span><span class="s1">):</span>
+            <span class="s1">fileNames.append(f)</span>
+
+    <span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">fileNames:</span>
+        <span class="s1">fileName</span><span class="s0">, </span><span class="s1">fileType = i.split(</span><span class="s4">'.'</span><span class="s1">)</span>
+        <span class="s1">metaData = fileName.split(</span><span class="s4">'-'</span><span class="s1">)      </span><span class="s5"># [0]: Gesture/Label, [1]: Trial</span>
+
+        <span class="s0">if </span><span class="s1">np.in1d(int(metaData[</span><span class="s3">1</span><span class="s1">])</span><span class="s0">, </span><span class="s1">classes):</span>
+          <span class="s1">data_read_ch0 = np.loadtxt(filepath+i</span><span class="s0">, </span><span class="s1">delimiter=</span><span class="s4">','</span><span class="s1">)  </span><span class="s5"># Choosing channel 6 as first channel for this exercise</span>
+
+          <span class="s1">len_data = len(data_read_ch0)</span>
+          <span class="s1">n_window = int(len_data/window_length)</span>
+
+          <span class="s1">data_windows_ch0 = [data_read_ch0[w*window_length:w*window_length+window_length] </span><span class="s0">for </span><span class="s1">w </span><span class="s0">in </span><span class="s1">range(n_window)]</span>
+
+          <span class="s1">data += [(a) </span><span class="s0">for </span><span class="s1">a </span><span class="s0">in </span><span class="s1">zip(data_windows_ch0)]</span>
+          <span class="s1">labels += [int(metaData[</span><span class="s3">1</span><span class="s1">])]*n_window</span>
+        <span class="s0">else</span><span class="s1">:</span>
+          <span class="s0">pass</span>
+    <span class="s5">#print(data, labels)</span>
+    <span class="s0">return </span><span class="s1">data</span><span class="s0">, </span><span class="s1">labels</span>
+
+
+
+<span class="s0">def </span><span class="s1">features_dataset(data</span><span class="s0">, </span><span class="s1">MAV=</span><span class="s0">True, </span><span class="s1">RMS=</span><span class="s0">True, </span><span class="s1">Var=</span><span class="s0">True, </span><span class="s1">SD=</span><span class="s0">True, </span><span class="s1">ZC=</span><span class="s0">True, </span><span class="s1">SSC=</span><span class="s0">True</span><span class="s1">):</span>
+    <span class="s1">dataset = []</span>
+    <span class="s0">for </span><span class="s1">d </span><span class="s0">in </span><span class="s1">data:</span>
+        <span class="s1">feature_vector = []</span>
+        <span class="s0">if </span><span class="s1">MAV==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getMAV(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s0">if </span><span class="s1">RMS==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getRMS(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s0">if </span><span class="s1">Var==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getVar(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s0">if </span><span class="s1">SD==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getSD(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s0">if </span><span class="s1">ZC==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getZC(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s0">if </span><span class="s1">SSC==</span><span class="s0">True</span><span class="s1">:</span>
+            <span class="s1">feature_vector += [getSSC(d[</span><span class="s3">0</span><span class="s1">])]</span>
+        <span class="s1">dataset += [feature_vector]</span>
+    <span class="s0">return </span><span class="s1">dataset</span>
+
+<span class="s5"># Loading recorded EMG signals into numpy arrays</span>
+<span class="s1">eff_0_0 = np.loadtxt(</span><span class="s4">'./data_simul/000-000.csv'</span><span class="s0">, </span><span class="s1">delimiter=</span><span class="s4">','</span><span class="s1">)</span>
+<span class="s1">eff_0_1 = np.loadtxt(</span><span class="s4">'./data_simul/000-001.csv'</span><span class="s0">, </span><span class="s1">delimiter=</span><span class="s4">','</span><span class="s1">)</span>
+<span class="s1">eff_0_2 = np.loadtxt(</span><span class="s4">'./data_simul/000-002.csv'</span><span class="s0">, </span><span class="s1">delimiter=</span><span class="s4">','</span><span class="s1">)</span>
+
+<span class="s5"># Define a function to plot the FFT of a signal</span>
+<span class="s0">def </span><span class="s1">plotfft(signal</span><span class="s0">, </span><span class="s1">fs</span><span class="s0">, </span><span class="s1">axis=[</span><span class="s3">0</span><span class="s0">, </span><span class="s3">500</span><span class="s0">, </span><span class="s3">0</span><span class="s0">, </span><span class="s3">2e5</span><span class="s1">]):</span>
+  <span class="s1">ps = np.abs(np.fft.fft(signal))**</span><span class="s3">2</span>
+  <span class="s1">time_step = </span><span class="s3">1</span><span class="s1">/fs</span>
+  <span class="s1">freqs = np.fft.fftfreq(signal.size</span><span class="s0">, </span><span class="s1">time_step)</span>
+  <span class="s1">idx = np.argsort(freqs)</span>
+  <span class="s1">plt.plot(freqs[idx]</span><span class="s0">, </span><span class="s1">ps[idx])</span>
+  <span class="s1">plt.axis(axis)</span>
+
+
+
+<span class="s5"># Exploratory data analysis (EDA)</span>
+<span class="s1">data = eff_0_1   </span><span class="s5"># Use index 6 and 17 for this exercise</span>
+                        <span class="s5"># (channel 6 and 17 of original data)</span>
+
+<span class="s1">plt.figure(figsize=(</span><span class="s3">15</span><span class="s0">, </span><span class="s3">3</span><span class="s1">))</span>
+<span class="s1">plt.subplot(</span><span class="s3">1</span><span class="s0">, </span><span class="s3">2</span><span class="s0">, </span><span class="s3">1</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'EMG Signal'</span><span class="s1">)</span>
+<span class="s1">plt.plot(data)</span>
+<span class="s1">plt.axis([</span><span class="s3">0</span><span class="s0">, None, </span><span class="s3">0</span><span class="s0">, </span><span class="s3">10</span><span class="s1">])</span>
+
+<span class="s1">plt.subplot(</span><span class="s3">1</span><span class="s0">, </span><span class="s3">2</span><span class="s0">, </span><span class="s3">2</span><span class="s1">)</span>
+<span class="s1">plt.title(</span><span class="s4">'FFT'</span><span class="s1">)</span>
+<span class="s1">plotfft(data</span><span class="s0">, </span><span class="s1">fs=</span><span class="s3">1000</span><span class="s1">)</span>
+
+<span class="s1">plt.show()</span>
+
+
+
+<span class="s5"># Loading recorded EMG signals into numpy arrays</span>
+<span class="s1">path = </span><span class="s4">'./data_simul/'</span>
+
+<span class="s1">classes = [</span><span class="s3">0</span><span class="s0">, </span><span class="s3">1</span><span class="s0">, </span><span class="s3">2</span><span class="s1">]</span>
+
+<span class="s1">data</span><span class="s0">, </span><span class="s1">labels = segment_dataset(path</span><span class="s0">, </span><span class="s1">window_length=</span><span class="s3">150</span><span class="s0">, </span><span class="s1">classes=classes)</span>
+
+<span class="s1">features_set = features_dataset(data</span><span class="s0">, </span><span class="s1">MAV=</span><span class="s0">True, </span><span class="s1">RMS=</span><span class="s0">True, </span><span class="s1">Var=</span><span class="s0">True, </span><span class="s1">SD=</span><span class="s0">True, </span><span class="s1">ZC=</span><span class="s0">True, </span><span class="s1">SSC=</span><span class="s0">True</span><span class="s1">)</span>
+
+<span class="s1">features_set = preprocessing.scale(features_set) </span><span class="s5"># preprocessing module imported from sklearn</span>
+
+
+<span class="s1">feat_x = </span><span class="s3">4  </span><span class="s5"># 0: MAV, 1: RMS, 2: Var, 3: SD, 4: ZC, 5: SSC</span>
+<span class="s1">feat_y = </span><span class="s3">3</span>
+
+<span class="s0">for </span><span class="s1">c </span><span class="s0">in </span><span class="s1">classes:</span>
+  <span class="s1">ind = np.where(np.array(labels)==c)</span>
+  <span class="s1">plt.scatter([f[feat_x] </span><span class="s0">for </span><span class="s1">f </span><span class="s0">in </span><span class="s1">features_set[ind]]</span><span class="s0">, </span><span class="s1">[f[feat_y] </span><span class="s0">for </span><span class="s1">f </span><span class="s0">in </span><span class="s1">features_set[ind]]</span><span class="s0">, </span><span class="s1">label=</span><span class="s4">'Class '</span><span class="s1">+str(c))</span>
+<span class="s1">plt.legend()</span>
+<span class="s1">plt.show()</span>
+
+
+<span class="s5">#traning algorithm</span>
+<span class="s1">avgScoreTemp = []</span>
+
+<span class="s1">kFold_rep = </span><span class="s3">3</span>
+<span class="s1">kFold_splits = </span><span class="s3">3</span>
+<span class="s1">kFold = RepeatedKFold(n_splits=kFold_splits</span><span class="s0">, </span><span class="s1">n_repeats=kFold_rep)</span>
+
+<span class="s0">for </span><span class="s1">i </span><span class="s0">in </span><span class="s1">range(kFold_rep):</span>
+  <span class="s0">for </span><span class="s1">i_Train</span><span class="s0">, </span><span class="s1">i_Test </span><span class="s0">in </span><span class="s1">kFold.split(features_set):</span>
+    <span class="s1">clf = LinearDiscriminantAnalysis()</span>
+    <span class="s1">X_train</span><span class="s0">, </span><span class="s1">X_test = [features_set[j] </span><span class="s0">for </span><span class="s1">j </span><span class="s0">in </span><span class="s1">i_Train]</span><span class="s0">, </span><span class="s1">[features_set[k] </span><span class="s0">for </span><span class="s1">k </span><span class="s0">in </span><span class="s1">i_Test]</span>
+    <span class="s1">y_train</span><span class="s0">, </span><span class="s1">y_test = [labels[l] </span><span class="s0">for </span><span class="s1">l </span><span class="s0">in </span><span class="s1">i_Train]</span><span class="s0">, </span><span class="s1">[labels[m] </span><span class="s0">for </span><span class="s1">m </span><span class="s0">in </span><span class="s1">i_Test]</span>
+
+    <span class="s1">clf.fit(X_train</span><span class="s0">, </span><span class="s1">y_train)</span>
+    <span class="s1">currentScore = clf.score(X_test</span><span class="s0">, </span><span class="s1">y_test)</span>
+
+    <span class="s1">avgScoreTemp += [currentScore]</span>
+
+<span class="s1">avgScore = sum(avgScoreTemp)/len(avgScoreTemp)</span>
+<span class="s1">print(</span><span class="s4">'Mean score with k-fold validation: {}'</span><span class="s1">.format(avgScore))</span></pre>
+</body>
+</html>
